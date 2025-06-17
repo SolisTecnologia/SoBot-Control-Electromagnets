@@ -35,17 +35,26 @@ The moviments direction are control with directions buttons.
 ### Required Libraries
 
 ~~~python
-import usb.core
-import usb.util
-from time import sleep
+import inputs
 import serial
 ~~~
 
-The ''usb.core'' and ''usb.util'' libraries are used to establish connection between the USB remote control and the Raspberry.
-
-The ''time'' library is needed to generate time delays and the ''serial'' library for serial/usb Raspberry connection with the robot controller driver.
+The ''inputs'' library is used to capture user input from gamepad.
+The ''serial'' library for serial/usb Raspberry connection with the robot controller driver.
 
 ### Code Description
+
+Commands used to configure wheel parameters and motion proportional gain, as follows:
+
+~~~python
+# Configure wheel parametres
+usb.write(b"WP MT1 WD99,84")
+usb.write(b"WP MT2 WD99,54")
+usb.write(b"WP DW264,95")
+# Set the motion proportional gain
+usb.write(b"PG SO2,3 CA3,22 DF6,11 RI-6")
+~~~
+
 
 The commands used in this example to control SoBot are continuous movement commands, as follows:
 
