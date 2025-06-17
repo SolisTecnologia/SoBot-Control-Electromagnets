@@ -4,242 +4,185 @@ Solis Robot - SoBot
 
 Control_Electromagnets.py: Programming example to control the SoBot by a USB remote control to move and control the electromagnets.
 
-Created By   : Vinicius M. Kawakami
-Version      : 1.0
+Created By   : Vinicius M. Kawakami and Rodrigo L. de Carvalho
+Version      : 2.0
 
 Company: Solis Tecnologia
 """
 
-import usb.core
-import usb.util
-from time import sleep
+import inputs
 import serial
 
-USB_IF      = 0 # Interface
-USB_TIMEOUT = 5 # Timeout in MS
-
-control = [0,0,0,0,0,0,0,0]
-
 flag_start = 0
-flag_pause = 0
-flag_r1 = 0
-flag_r2 = 0
-flag_l1 = 0
-flag_l2 = 0
-flag_pause_elev = 0
+flag_BT_RZ = 0
+flag_BT_Z = 0
+flag_r5 = 0
+flag_r6 = 0
+flag_r7 = 0
+flag_r8 = 0
 
-BTN_LEFT = 0
-BTN_RIGHT = 255
-BTN_UP = 0
-BTN_DOWN = 255
-BTN_START = 32
-BTN_DIR_OPEN = 127
-BTN_R1 = 2
-BTN_R2 = 8
-BTN_L1 = 1
-BTN_L2 = 4
-BTN_X = 79
-BTN_TRI = 31
 
-# Config ID to specific controller HID
-USB_VENDOR  = 0x0079 # DragonRise Inc.
-USB_PRODUCT = 0x0006 # PC TWIN SHOCK Gamepad
+# Find the Logitech F710 controller ID connected to the Raspberry Pi
+gamepad = inputs.devices.gamepads[0]
+print(gamepad)
 
-# Open Serial port USB
-serialUSB = serial.Serial('/dev/ttyACM0', 9600, timeout=0, dsrdtr=False)
-serialUSB .flush()
+# Configure the serial port
+usb = serial.Serial('/dev/ttyACM0', 57600, timeout=0, dsrdtr=False)
+usb.flush()
 
-# Find specific HID connected
-dev = usb.core.find(idVendor=USB_VENDOR, idProduct=USB_PRODUCT)
+# Configure wheel parametres
+usb.write(b"WP MT1 WD99,84")
+usb.write(b"WP MT2 WD99,54")
+usb.write(b"WP DW264,95")
 
-endpoint = dev[0][(0,0)][0]
+# Set the motion proportional gain
+usb.write(b"PG SO2,3 CA3,22 DF6,11 RI-6")
 
-if dev.is_kernel_driver_active(USB_IF) is True:
-  dev.detach_kernel_driver(USB_IF)
-
-usb.util.claim_interface(dev, USB_IF)
-
-serialUSB.write(b"MT0 MC AT100 DT100 V2") # Parameter settings for continuous mode
+# Configure operating parametres in continuous mode
+usb.write(b"MT0 MC MD0 AT100 DT100 V8")
 
 while True:
-    # Control status reading
-    try:
-        control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-        print(control)
-    except:
-        pass
-    # Check the Start button
-    if(control[6] == BTN_START):
-        if(flag_start == 0):
-            flag_start = 1
-            serialUSB.write(b"MT0 ME1")
-            serialUSB.write(b"LT E1 RD0 GR0 BL50")    # Turn on led tape in blue
-        else:
-            flag_start = 0
-            serialUSB.write(b"MT0 ME0")
-            serialUSB.write(b"LT E0")
-        # Waits for the button to be released
-        while(control[6] == BTN_START):
-            sleep(0.1)
-            try:
-                control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                print(control)
-            except:
-                pass
-    if(flag_start == 1):
-        # Check the Left button
-        if((control[0] == BTN_LEFT) and (control[1] == BTN_DIR_OPEN)):
-            flag_pause = 1
-            serialUSB.write(b"MT0 ML")
-            serialUSB.write(b"LT E1 RD0 GR30 BL5")
-            # Waits for the button to be released
-            while(control[0] == BTN_LEFT):
-                sleep(0.1)
-                try:
-                    control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                    print(control)
-                except:
-                    pass
-        # Check the Right button
-        elif((control[0] == BTN_RIGHT) and (control[1] == BTN_DIR_OPEN)):
-            flag_pause = 1
-            serialUSB.write(b"MT0 MR")
-            serialUSB.write(b"LT E1 RD30 GR0 BL5")
-            # Waits for the button to be released
-            while(control[0] == BTN_RIGHT):
-                sleep(0.1)
-                try:
-                    control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                    print(control)
-                except:
-                    pass
-        # Check the Down button
-        elif((control[1] == BTN_DOWN) and (control[0] == BTN_DIR_OPEN)):
-            flag_pause = 1
-            serialUSB.write(b"MT0 MB")
-            serialUSB.write(b"LT E1 RD30 GR15 BL0")
-            # Waits for the button to be released
-            while (control[1] == BTN_DOWN):
-                sleep(0.1)
-                try:
-                    control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                    print(control)
-                except:
-                    pass
-        # Check the Up button
-        elif((control[1] == BTN_UP) and (control[0] == BTN_DIR_OPEN)):
-            flag_pause = 1
-            serialUSB.write(b"MT0 MF")
-            serialUSB.write(b"LT E1 RD0 GR50 BL0")
-            # Waits for the button to be released
-            while(control[1] == BTN_UP):
-                sleep(0.1)
-                try:
-                    control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                    print(control)
-                except:
-                    pass
-        # If no direction button is pressed, send Pause Movement command one time
-        if(flag_pause == 1):
-            flag_pause = 0
-            serialUSB.write(b"MT0 MP")
-            serialUSB.write(b"LT E1 RD0 GR0 BL50")
-    # check the R1 button
-    if(control[6] == BTN_R1):
-        if(flag_r1 == 0):
-            flag_r1 = 1
-            serialUSB.write(b"DO5 E1")
-        else:
-            flag_r1 = 0
-            serialUSB.write(b"DO5 E0")
-        # Waits for the button to be released
-        while(control[6] == BTN_R1):
-            sleep(0.1)
-            try:
-                control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                print(control)
-            except:
-                pass
-    # check the R2 button
-    if(control[6] == BTN_R2):
-        if(flag_r2 == 0):
-            flag_r2 = 1
-            serialUSB.write(b"DO6 E1")
-        else:
-            flag_r2 = 0
-            serialUSB.write(b"DO6 E0")
-        # Waits for the button to be released
-        while(control[6] == BTN_R2):
-            sleep(0.1)
-            try:
-                control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                print(control)
-            except:
-                pass
-    # check the L1 button
-    if(control[6] == BTN_L1):
-        if(flag_l1 == 0):
-            flag_l1 = 1
-            serialUSB.write(b"DO8 E1")
-        else:
-            flag_l1 = 0
-            serialUSB.write(b"DO8 E0")
-        # Waits for the button to be released
-        while(control[6] == BTN_L1):
-            sleep(0.1)
-            try:
-                control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                print(control)
-            except:
-                pass
-    # check the L2 button
-    if(control[6] == BTN_L2):
-        if(flag_l2 == 0):
-            flag_l2 = 1
-            serialUSB.write(b"DO7 E1")
-        else:
-            flag_l2 = 0
-            serialUSB.write(b"DO7 E0")
-        # Waits for the button to be released
-        while(control[6] == BTN_L2):
-            sleep(0.1)
-            try:
-                control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                print(control)
-            except:
-                pass
-    # check the X button
-    if(control[5] == BTN_X):
-        flag_pause_elev = 1
-        serialUSB.write(b"EL DN")
-        serialUSB.write(b"LT E1 RD50 GR20 BL3")
-        # Waits for the button to be released
-        while(control[5] == BTN_X):
-            sleep(0.1)
-            try:
-                control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                print(control)
-            except:
-                pass
-        serialUSB.write(b"LT E0")
-    # check the Triangle button
-    elif(control[5] == BTN_TRI):
-        flag_pause_elev = 1
-        serialUSB.write(b"EL UP")
-        serialUSB.write(b"LT E1 RD30 GR50 BL5")
-        # Waits for the button to be released
-        while(control[5] == BTN_TRI):
-            sleep(0.1)
-            try:
-                control = dev.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize, USB_TIMEOUT)
-                print(control)
-            except:
-                pass
-        serialUSB.write(b"LT E0")
-    if(flag_pause_elev == 1):
-        flag_pause_elev = 0
-        serialUSB.write(b"EL ST")
-        if(flag_start == 1):
-            serialUSB.write(b"LT E1 RD0 GR0 BL50")
+    
+    events = inputs.get_gamepad()   # Checks if there was any control event
+    
+    for event in events:
+        
+        # Checks if it is event of type "KEY"
+        if event.ev_type == "Key":
+            print(f"Evento code: {event.code}")
+            print(f"Evento state: {event.state}")
 
-    sleep(0.1) # Let CTRL+C actually exit
+            # Check if the event code is "BTN_START" in state 1
+            if event.code == "BTN_START" and event.state == 1:
+                print("BotÃ£o Start pressionado")
+                if flag_start == 0:
+                    flag_start = 1
+                    usb.write(b"MT0 ME1")               # Enable motors
+                    usb.write(b"LT E1 RD0 GR0 BL100")   # Turn on Led Tap
+
+                else:
+                    flag_start = 0
+                    usb.write(b"MT0 ME0")               # Disable motors
+                    usb.write(b"LT E0")                 # Turn off Led Tap
+
+            # Check if the event code is "BTN_SOUTH" in state 1
+            if event.code == "BTN_SOUTH" and event.state == 1:
+                print("BotÃ£o A pressionado")
+                if(flag_r5 == 0):
+                    flag_r5 = 1
+                    usb.write(b"DO5 E1")
+                    print("Rele 5 Ativado")
+                else:
+                    flag_r5 = 0
+                    usb.write(b"DO5 E0")
+                    print("Rele 5 Desativado")
+
+            # Check if the event code is "BTN_EAST" in state 1
+            elif event.code == "BTN_EAST" and event.state == 1:
+                print("BotÃ£o B pressionado")
+                print(flag_r6)
+                if(flag_r6 == 0):
+                    flag_r6 = 1
+                    usb.write(b"DO6 E1")
+                    print("Rele 6 Ativado")
+                else:
+                    flag_r6 = 0
+                    usb.write(b"DO6 E0")
+                    print("Rele 6 Desativado")
+
+            # Check if the event code is "BTN_NORTH" in state 1
+            elif event.code == "BTN_NORTH" and event.state == 1:
+                print("BotÃ£o X pressionado")
+                if(flag_r8 == 0):
+                    flag_r8 = 1
+                    usb.write(b"DO8 E1")
+                    print("Rele 8 Ativado")
+                else:
+                    flag_r8 = 0
+                    usb.write(b"DO8 E0")
+                    print("Rele 8 Desativado")
+
+            # Check if the event code is "BTN_WEST" in state 1
+            elif event.code == "BTN_WEST" and event.state == 1:
+                print("BotÃ£o Y pressionado")
+                if(flag_r7 == 0):
+                    flag_r7 = 1
+                    usb.write(b"DO7 E1")
+                    print("Rele 7 Ativado")
+                else:
+                    flag_r7 = 0
+                    usb.write(b"DO7 E0")
+                    print("Rele 7 Desativado")
+
+            # Check if the event code is "BTN_TR" in state 1
+            elif event.code == "BTN_TR" and event.state == 1:
+                print("BotÃ£o RB pressionado")
+                # Configure continuous mode with curve on the same axis
+                usb.write(b"MT0 MC MD0 AT100 DT100 V8")
+
+            # Check if the event code is "BTN_TL" in state 1
+            elif event.code == "BTN_TL" and event.state == 1:
+                print("BotÃ£o LB pressionado")
+                # Configure continuous mode with differential curve
+                usb.write(b"MT0 MC MD1 RI100 AT100 DT100 V8")
+
+        # Checks if it is event of type "Absolute"
+        if event.ev_type == "Absolute":
+            print(f"Evento code: {event.code}")
+            print(f"Evento state: {event.state}")
+
+            ### Buttons to control the direction ###
+            # Events with the MODE button disabled
+            # Check if the event code is "ABS_HAT0X"
+            if event.code == "ABS_HAT0X":
+                if flag_start:                  # Check if flag_start is enable
+                    if event.state == -1:       # Check state (left direction) of the button
+                        print("BotÃ£o ESQ pressionado")
+                        usb.write(b"MT0 ML")
+
+                    elif event.state == 1:      # Check state (right direction) of the button
+                        print("BotÃ£o DIR pressionado")
+                        usb.write(b"MT0 MR")
+
+                    else:
+                        usb.write(b"MT0 MP")
+
+            # Check if the event code is "ABS_HAT0Y"
+            if event.code == "ABS_HAT0Y":
+                if flag_start:                  # Check if flag_start is enable
+                    if event.state == -1:       # Check state (front direction) of the button
+                        print("BotÃ£o FRENTE pressionado")
+                        usb.write(b"MT0 MF")
+
+                    elif event.state == 1:      # Check state (back direction) of the button
+                        print("BotÃ£o TRAS pressionado")
+                        usb.write(b"MT0 MB")
+
+                    else:
+                        usb.write(b"MT0 MP")
+            
+            ### Buttons to control the lift ###
+            # Check if the event code is "ABS_RZ"
+            if event.code == "ABS_RZ":
+                if event.state >= 1:            # Check if state is greater than 1 (button pressed)
+                    if flag_BT_RZ == 0:
+                        flag_BT_RZ = 1
+                        print("BotÃ£o RZ pressionado")
+                        usb.write(b"EL UP")
+                elif event.state == 0:
+                    print("BotÃ£o RZ solto")
+                    flag_BT_RZ = 0
+                    usb.write(b"EL ST")
+
+            # Check if the event code is "ABS_Z"
+            if event.code == "ABS_Z":
+                if event.state >= 1:            # Check if state is greater than 1 (button pressed)
+                    if flag_BT_Z == 0:
+                        flag_BT_Z = 1
+                        print("BotÃ£o Z pressionado")
+                        usb.write(b"EL DN")
+                elif event.state == 0:
+                    print("BotÃ£o Z solto")
+                    flag_BT_Z = 0
+                    usb.write(b"EL ST")
+
